@@ -154,6 +154,7 @@
 .oa-bevinding.oa-fout { border-color: #c4001a; }
 .oa-bevinding.oa-waarschuwing { border-color: #c47a00; }
 .oa-bevinding .utrecht-paragraph { margin: 0 0 4px; }
+.oa-alles { display: grid; gap: 4px; margin: 12px 0 4px; justify-items: start; }
 .oa-acties { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
 .oa-acties .utrecht-textbox { flex: 1 1 160px; }
 .oa-motorkap { margin-top: auto; border-top: 1px solid var(--utrecht-separator-color, #ccc); padding-top: 8px; font-size: 0.875em; }

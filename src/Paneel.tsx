@@ -321,6 +321,36 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
       setAntwoorden({});
     });
 
+  // Alles in één keer: hoogstens drie rondes. Een bevinding binnen of rond een
+  // andere (een vet woord in een lijst die ook verandert) komt in de volgende ronde.
+  const doeAllesHerstellen = () =>
+    voerUit("alles-herstellen", async () => {
+      let lijst = bevindingen ?? [];
+      let antw = antwoorden;
+      let hersteld = 0;
+      let terugval: string | undefined;
+      for (let ronde = 0; ronde < 3; ronde++) {
+        const u = await toegankelijkheid.herstelAlles(adapter, lijst, antw);
+        hersteld += u.hersteld.length;
+        terugval ??= u.terugval;
+        if (!u.hersteld.length) break;
+        lijst = (await toegankelijkheid.beoordeel(adapter, verbinding)).bevindingen;
+        antw = {};
+        if (!u.uitgesteld.length) break;
+      }
+      setBevindingen(lijst);
+      setAntwoorden({});
+      const over = lijst.length;
+      setMelding({
+        soort: terugval ? "info" : "ok",
+        tekst:
+          `${hersteld} bevinding${hersteld === 1 ? "" : "en"} hersteld.` +
+          (over ? ` Nog ${over} over: die vragen om een antwoord of moet je in het document zelf oplossen.` : " Het stuk voldoet nu aan de gecontroleerde punten.") +
+          (terugval ? ` ${terugval}` : ""),
+      });
+    });
+  const aantalHerstelbaar = (bevindingen ?? []).filter((b) => toegankelijkheid.herstelbaar(b, antwoorden[b.id])).length;
+
   const kanTonen = heeftVermogen(omgeving, "plek-tonen") && !!adapter.toonPlek;
   const objectId = stand?.object?.identificatie ?? null;
   const piiRegister = useCallback(async () => (objectId ? verbinding.piiRegister(objectId) : null), [verbinding, objectId]);
@@ -748,6 +778,14 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
               {bevindingen ? "Opnieuw beoordelen" : "Beoordelen"}
             </SecondaryActionButton>
             {bevindingen && bevindingen.length === 0 && <Paragraph>Geen bevindingen. Het stuk voldoet aan de gecontroleerde punten.</Paragraph>}
+            {aantalHerstelbaar > 1 && (
+              <div className="oa-alles">
+                <PrimaryActionButton onClick={doeAllesHerstellen} disabled={uit || bezig !== null} busy={bezig === "alles-herstellen"}>
+                  Alles herstellen ({aantalHerstelbaar})
+                </PrimaryActionButton>
+                <Paragraph small>Neemt alle voorstellen over, en de antwoorden die je al hebt ingevuld. Een afbeelding zonder alternatieve tekst slaat hij over; die doe je per stuk.</Paragraph>
+              </div>
+            )}
             {bevindingen && bevindingen.length > 0 && (
               <ul className="oa-bevindingen">
                 {bevindingen.map((b) => (

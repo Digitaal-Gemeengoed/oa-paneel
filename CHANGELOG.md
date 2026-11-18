@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.13.0 — 2026-11-18
+
+- **Toegankelijkheid: Alles herstellen.** Bij twee of meer herstelbare bevindingen staat er een knop *Alles herstellen (n)*. Hij neemt alle voorstellen over, en de antwoorden die al zijn ingevuld; een afbeelding zonder alternatieve tekst slaat hij over. Daarna beoordeelt het paneel opnieuw (hoogstens drie rondes, voor bevindingen die binnen een andere lagen) en zegt hoeveel er hersteld is en hoeveel er over zijn.
+- Hangt af van oa-kern 0.9.0.
+
 ## 0.12.0 — 2026-11-10
 
 - **Classificeren** is er: voorstellen van de assistent, zoeken in de selectielijst, eigen attributen, de einddatum van het procesobject als de termijn daarop ingaat, en vooraf wat de keuze betekent voor het bewaren. Klein bovenaan: naam en versie van het classificatiemodel.
