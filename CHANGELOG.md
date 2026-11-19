@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.16.0 — 2026-11-19
+
+**Ondersteunend in twee stappen.** Onder "Geen onderdeel van een proces?" ziet de medewerker eerst de toetsvragen van de gemeente en vinkt aan dat geen ervan geldt; pas dan verschijnen de categorieën (O1 tot en met O5, elk met voorbeelden en termijn). Hoort het stuk bij een zaak, dan wijst het paneel op toetsvraag 4. Vink je het weer uit, dan vervalt de keuze. Zonder toetsvragen of categorieën werkt het als voorheen.
+
 ## 0.15.0 — 2026-11-19
 
 Classificeren:

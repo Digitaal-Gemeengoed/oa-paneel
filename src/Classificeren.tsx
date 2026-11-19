@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, FormField, Paragraph, PrimaryActionButton, Select, SelectOption, StatusBadge, SubtleButton, Textbox, Heading3 } from "@utrecht/component-library-react";
-import { bepaalBewaren, duurInWoorden, ONDERSTEUNEND, ondersteunendResultaat, rolWaarden, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
+import { bepaalBewaren, duurInWoorden, isOndersteunend, ondersteunendeKlassen, rolWaarden, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
 import { classificeren, type ClassificatieAntwoord, type Klasse, type Klassetak, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
 
 /** "vernietigen na 10 jaar" of "blijvend bewaren". */
@@ -8,6 +8,12 @@ export function termijnTekst(r: Klasse): string {
   if (r.waardering === "blijvend-bewaren") return "blijvend bewaren";
   if (r.bewaartermijn) return `vernietigen na ${duurInWoorden(r.bewaartermijn)}`;
   return `vernietigen: ${r.bewaartermijnTekst ?? "zie de toelichting"}`;
+}
+
+/** "Ondersteunend · O3 Tussenversie", of "12.2 Verleend" voor een klasse uit de selectielijst. */
+export function klasseKop(r: Klasse): string {
+  if (!isOndersteunend(r.id)) return `${r.id} ${r.naam}`;
+  return r.procestype === 0 && r.omschrijving && r.omschrijving !== "zonder archiefwaarde" ? `Ondersteunend · ${r.omschrijving} ${r.naam}` : "Ondersteunend, zonder archiefwaarde";
 }
 
 function platteTekst(html: string): string {
@@ -117,6 +123,8 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   const [voorstellen, setVoorstellen] = useState<Klassevoorstel[] | null>(null);
   const [bezig, setBezig] = useState(false);
   const [fouten, setFouten] = useState<Record<string, string>>({});
+  // Ondersteunend: de medewerker bevestigt eerst dat geen van de toetsvragen geldt.
+  const [bevestigd, setBevestigd] = useState(!!huidig?.toetsvragenBevestigd);
   // Kiezen in stappen: procestype, dan het generieke resultaat (met uitwerkingen). Begin bij de huidige klasse.
   const [pad, setPad] = useState<{ procestype: number | null; groep: string | null }>(() => {
     const r = klassen?.selectielijst?.resultaten.find((x) => x.id === huidig?.resultaat);
@@ -159,9 +167,11 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   }, [verbinding, lijst, object.identificatie, object.metadata]);
 
   const procestype = useMemo(() => new Map((lijst?.procestypen ?? []).map((p) => [p.nummer, p])), [lijst]);
-  // Ondersteunend: geen klasse uit de selectielijst, maar de gemeente kan het aanzetten.
-  const steun = useMemo<Klasse | null>(() => (model?.config.ondersteunend ? ondersteunendResultaat(model.config.ondersteunend) : null), [model]);
-  const klasseVan = (id: string): Klasse | undefined => (id === ONDERSTEUNEND ? (steun ?? undefined) : lijst?.resultaten.find((r) => r.id === id));
+  // Ondersteunend: geen klasse uit de selectielijst, maar categorieën die de gemeente zelf vastlegt.
+  const steun = model?.config.ondersteunend ?? null;
+  const steunKlassen = useMemo<Klasse[]>(() => ondersteunendeKlassen(model?.config.ondersteunend), [model]);
+  const toetsvragen = steun?.toetsvragen ?? [];
+  const klasseVan = (id: string): Klasse | undefined => (isOndersteunend(id) ? steunKlassen.find((k) => k.id === id) : lijst?.resultaten.find((r) => r.id === id));
   const gekozen = klasseVan(keuze);
   const gevonden = useMemo(() => (lijst ? classificeren.zoek(lijst.resultaten, lijst.procestypen, vraag) : []), [lijst, vraag]);
   const takken = useMemo(() => (lijst ? classificeren.boom(lijst.resultaten, lijst.procestypen) : []), [lijst]);
@@ -182,7 +192,9 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   const gewijzigd =
     keuze !== (huidig?.resultaat ?? "") ||
     JSON.stringify(attributen) !== JSON.stringify(huidig?.attributen ?? {}) ||
-    einddatum !== (huidig?.einddatumProcesobject ?? "");
+    einddatum !== (huidig?.einddatumProcesobject ?? "") ||
+    (isOndersteunend(keuze) && toetsvragen.length > 0 && bevestigd !== !!huidig?.toetsvragenBevestigd);
+  const moetBevestigen = isOndersteunend(keuze) && toetsvragen.length > 0 && !bevestigd;
 
   const kies = (id: string) => {
     setKeuze(id);
@@ -203,9 +215,10 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
         resultaat: keuze,
         ...(Object.keys(attributen).length ? { attributen: Object.fromEntries(Object.entries(attributen).filter(([, w]) => w !== "")) } : {}),
         ...(einddatum ? { einddatumProcesobject: einddatum } : {}),
+        ...(isOndersteunend(keuze) && toetsvragen.length ? { toetsvragenBevestigd: bevestigd } : {}),
       });
       setStand(s);
-      melding({ soort: "ok", tekst: `De classificatie is vastgelegd: ${keuze}. ${s.object!.bewaren?.uitleg ?? ""}` });
+      melding({ soort: "ok", tekst: `De classificatie is vastgelegd: ${gekozen ? klasseKop(gekozen) : keuze}. ${s.object!.bewaren?.uitleg ?? ""}` });
     } catch (e) {
       const d = (e as { details?: { veld: string; melding: string }[] }).details;
       if (Array.isArray(d)) setFouten(Object.fromEntries(d.map((x) => [x.veld, x.melding])));
@@ -223,7 +236,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
           {r.omschrijving && <> · {r.omschrijving}</>}
         </span>
         <span className="oa-klein">
-          {r.id === ONDERSTEUNEND ? "geen archiefwaarde" : procestype.get(r.procestype)?.naam} · {termijnTekst(r)}
+          {isOndersteunend(r.id) ? "geen archiefwaarde" : procestype.get(r.procestype)?.naam} · {termijnTekst(r)}
           {r.afwijking && " (eigen termijn)"}
         </span>
         {knop && <span className="oa-klein oa-waarom">{knop}</span>}
@@ -241,7 +254,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
       {huidig && (
         <div className="oa-kader oa-kader-rustig">
           <Paragraph small>
-            Nu: {huidig.resultaat === ONDERSTEUNEND ? <b>Ondersteunend</b> : <><b>{huidig.resultaat}</b> {klasseVan(huidig.resultaat)?.naam}</>}
+            Nu: {isOndersteunend(huidig.resultaat) ? <b>{klasseVan(huidig.resultaat) ? klasseKop(klasseVan(huidig.resultaat)!) : "Ondersteunend"}</b> : <><b>{huidig.resultaat}</b> {klasseVan(huidig.resultaat)?.naam}</>}
             {object.bewaren && <> · {object.bewaren.uitleg}</>}
           </Paragraph>
         </div>
@@ -275,8 +288,8 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
                             }}
                           >
                             <span className="oa-klasse-kop">
-                              <b>{k.id === ONDERSTEUNEND ? "Ondersteunend" : k.id}</b> {k.id === ONDERSTEUNEND ? k.omschrijving : k.naam}
-                              {k.id !== ONDERSTEUNEND && k.omschrijving && <> · {k.omschrijving}</>}
+                              <b>{k.id}</b> {k.naam}
+                              {k.omschrijving && <> · {k.omschrijving}</>}
                             </span>
                             <span className="oa-klein">
                               {termijnTekst(k)} · {z.aantal} {z.aantal === 1 ? "stuk" : "stukken"} in {zaak.rol === "zaak" ? "deze zaak" : "dit dossier"}
@@ -313,30 +326,63 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
           ) : (
             <Stappen takken={takken} pad={pad} setPad={setPad} regel={regel} />
           )}
-          {steun && (
-            <>
+          {steun && steunKlassen.length > 0 && (
+            <div className="oa-steun">
               <Heading3>Geen onderdeel van een proces?</Heading3>
-              <Paragraph small>{steun.toelichting}</Paragraph>
-              <ul className="oa-klassen">
-                <li className={`oa-klasse${keuze === ONDERSTEUNEND ? " gekozen" : ""}`}>
-                  <button type="button" onClick={() => kies(ONDERSTEUNEND)} aria-pressed={keuze === ONDERSTEUNEND}>
-                    <span className="oa-klasse-kop"><b>Ondersteunend</b>, zonder archiefwaarde</span>
-                    <span className="oa-klein">vernietigen {duurInWoorden(steun.bewaartermijn!)} na het classificeren · {steun.herkomst}</span>
-                  </button>
-                </li>
-              </ul>
-            </>
+              <Paragraph small>{steun.omschrijving}</Paragraph>
+              {toetsvragen.length > 0 && (
+                <div className="oa-kader oa-toets">
+                  <Paragraph small>
+                    <b>Eerst nagaan.</b> Is het antwoord op een van deze vragen ja, dan is het stuk niet ondersteunend: kies dan hierboven een klasse uit de selectielijst.
+                  </Paragraph>
+                  <ol>
+                    {toetsvragen.map((v, i) => <li key={i}>{v}</li>)}
+                  </ol>
+                  {zaak?.rol === "zaak" && (
+                    <Paragraph small className="oa-waarschuwing-tekst">Dit stuk hoort bij zaak {zaak.waarde}. Is het bij de afhandeling gebruikt, dan volgt het de klasse van de zaak.</Paragraph>
+                  )}
+                  <label className="oa-vinkregel">
+                    <input
+                      type="checkbox"
+                      checked={bevestigd}
+                      onChange={(e) => {
+                        setBevestigd(e.target.checked);
+                        if (!e.target.checked && isOndersteunend(keuze)) setKeuze(huidig && !isOndersteunend(huidig.resultaat) ? huidig.resultaat : "");
+                      }}
+                    />
+                    <span>Geen van deze vragen geldt voor dit stuk</span>
+                  </label>
+                  {fouten.toetsvragenBevestigd && <Paragraph small className="oa-fouttekst">{fouten.toetsvragenBevestigd}</Paragraph>}
+                </div>
+              )}
+              {(bevestigd || toetsvragen.length === 0) && (
+                <ul className="oa-klassen" aria-label="Categorieën ondersteunende stukken">
+                  {steunKlassen.map((k) => (
+                    <li key={k.id} className={`oa-klasse${keuze === k.id ? " gekozen" : ""}`}>
+                      <button type="button" onClick={() => kies(k.id)} aria-pressed={keuze === k.id}>
+                        <span className="oa-klasse-kop">
+                          {k.id === "ondersteunend" ? <><b>Ondersteunend</b>, zonder archiefwaarde</> : <><b>{k.omschrijving}</b> {k.naam}</>}
+                        </span>
+                        {k.id !== "ondersteunend" && <span className="oa-klein">{k.toelichting}</span>}
+                        <span className="oa-klein">vernietigen {duurInWoorden(k.bewaartermijn!)} na het classificeren</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </>
       )}
 
       {gekozen && (
         <div className="oa-gekozen">
-          <Heading3>
-            {gekozen.id === ONDERSTEUNEND ? "Ondersteunend, zonder archiefwaarde" : `${gekozen.id} ${gekozen.naam}`}
-          </Heading3>
-          {gekozen.id === ONDERSTEUNEND ? (
-            <Paragraph small>Grondslag: {gekozen.herkomst}</Paragraph>
+          <Heading3>{klasseKop(gekozen)}</Heading3>
+          {isOndersteunend(gekozen.id) ? (
+            <>
+              {gekozen.id !== "ondersteunend" && <Paragraph small>{gekozen.toelichting}</Paragraph>}
+              <Paragraph small>Grondslag: {gekozen.herkomst}</Paragraph>
+            </>
           ) : (
             <Paragraph small>
               {procestype.get(gekozen.procestype)?.nummer}. {procestype.get(gekozen.procestype)?.naam}
@@ -347,7 +393,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
             <StatusBadge status={gekozen.waardering === "blijvend-bewaren" ? "safe" : "neutral"}>{termijnTekst(gekozen)}</StatusBadge>
             {gekozen.afwijking && <span className="oa-klein"> · afwijking van de selectielijst: {gekozen.afwijking.reden}</span>}
           </Paragraph>
-          {gekozen.id !== ONDERSTEUNEND && (gekozen.toelichting || gekozen.procestermijnTekst) && (
+          {!isOndersteunend(gekozen.id) && (gekozen.toelichting || gekozen.procestermijnTekst) && (
             <details className="oa-klein">
               <summary>Toelichting uit de selectielijst</summary>
               {gekozen.toelichting && <p>{gekozen.toelichting}</p>}
@@ -403,7 +449,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
           )}
           {!alleenLezen && (
             <div className="oa-acties">
-              <PrimaryActionButton onClick={legVast} disabled={uit || bezig || !gewijzigd} busy={bezig}>
+              <PrimaryActionButton onClick={legVast} disabled={uit || bezig || !gewijzigd || moetBevestigen} busy={bezig}>
                 Classificatie vastleggen
               </PrimaryActionButton>
               {gewijzigd && huidig && (
@@ -412,6 +458,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
                     setKeuze(huidig.resultaat);
                     setAttributen(huidig.attributen ?? {});
                     setEinddatum(huidig.einddatumProcesobject ?? "");
+                    setBevestigd(!!huidig.toetsvragenBevestigd);
                   }}
                 >
                   Terug naar de vastgelegde
