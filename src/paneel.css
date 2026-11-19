@@ -289,6 +289,14 @@
 .oa-klasse button:focus-visible { outline: 2px solid var(--utrecht-focus-outline-color, #1a5ea8); outline-offset: 2px; }
 .oa-klasse.gekozen button { border-color: var(--utrecht-button-primary-action-background-color, #1a5ea8); box-shadow: inset 3px 0 0 var(--utrecht-button-primary-action-background-color, #1a5ea8); }
 .oa-klasse-kop { font-size: 0.875rem; }
+.oa-stappen { display: flex; flex-direction: column; gap: 8px; }
+.oa-kruimel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 0.8125rem; }
+.oa-kruimel button { background: none; border: 0; padding: 2px 0; font: inherit; color: var(--utrecht-link-color, #1a5ea8); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.oa-kruimel button[aria-current="step"], .oa-kruimel span[aria-current="step"] { color: inherit; text-decoration: none; font-weight: 600; cursor: default; }
+.oa-stap button { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 8px; width: 100%; text-align: start; font: inherit; color: inherit; background: #f7f8fa; border: 1px solid #ccc; border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+.oa-stap button::after { content: "›"; grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 1.2rem; color: #666; }
+.oa-stap button:hover { border-color: var(--utrecht-button-primary-action-background-color, #1a5ea8); }
+.oa-stap button:focus-visible { outline: 2px solid var(--utrecht-focus-outline-color, #1a5ea8); outline-offset: 2px; }
 .oa-waarom { font-style: italic; }
 .oa-gekozen { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #ddd; padding-top: 8px; }
 .oa-gekozen .utrecht-paragraph { margin: 0; }

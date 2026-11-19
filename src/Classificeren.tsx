@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, FormField, Paragraph, PrimaryActionButton, Select, SelectOption, StatusBadge, SubtleButton, Textbox, Heading3 } from "@utrecht/component-library-react";
 import { bepaalBewaren, duurInWoorden, rolWaarden, type Adapter, type Objecttype, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
-import { classificeren, type ClassificatieAntwoord, type Klasse, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
+import { classificeren, type ClassificatieAntwoord, type Klasse, type Klassetak, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
 
 /** "vernietigen na 10 jaar" of "blijvend bewaren". */
 export function termijnTekst(r: Klasse): string {
@@ -36,6 +36,77 @@ interface Props {
  * de assistent), eigen attributen invullen, en zien wat dat betekent voor
  * het bewaren.
  */
+/**
+ * Kiezen in stappen, zoals de selectielijst is ingedeeld: eerst het
+ * procestype, dan het resultaat; heeft dat uitwerkingen, dan daarna de
+ * uitwerking (of het resultaat in het algemeen).
+ */
+function Stappen({ takken, pad, setPad, regel }: {
+  takken: Klassetak[];
+  pad: { procestype: number | null; groep: string | null };
+  setPad: (p: { procestype: number | null; groep: string | null }) => void;
+  regel: (r: Klasse, knop?: string) => ReactNode;
+}) {
+  const tak = takken.find((t) => t.procestype.nummer === pad.procestype);
+  const groep = tak?.groepen.find((g) => g.id === pad.groep);
+  return (
+    <div className="oa-stappen">
+      <nav className="oa-kruimel" aria-label="Waar je bent in de selectielijst">
+        <button type="button" onClick={() => setPad({ procestype: null, groep: null })} aria-current={!tak ? "step" : undefined}>Alle procestypen</button>
+        {tak && (
+          <>
+            <span aria-hidden="true">›</span>
+            <button type="button" onClick={() => setPad({ procestype: tak.procestype.nummer, groep: null })} aria-current={!groep ? "step" : undefined}>
+              {tak.procestype.nummer}. {tak.procestype.naam}
+            </button>
+          </>
+        )}
+        {groep && (
+          <>
+            <span aria-hidden="true">›</span>
+            <span aria-current="step">{groep.id} {groep.naam}</span>
+          </>
+        )}
+      </nav>
+      {!tak ? (
+        <ul className="oa-klassen">
+          {takken.map((t) => (
+            <li key={t.procestype.nummer} className="oa-stap">
+              <button type="button" onClick={() => setPad({ procestype: t.procestype.nummer, groep: null })}>
+                <span className="oa-klasse-kop"><b>{t.procestype.nummer}.</b> {t.procestype.naam}</span>
+                <span className="oa-klein">{t.aantal} {t.aantal === 1 ? "klasse" : "klassen"}{t.procestype.procesobject ? ` · ${t.procestype.procesobject}` : ""}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : !groep ? (
+        <>
+          {tak.procestype.omschrijving && <Paragraph small>{tak.procestype.omschrijving}</Paragraph>}
+          <ul className="oa-klassen">
+            {tak.groepen.map((g) =>
+              g.uitwerkingen.length === 0 && g.zelf ? (
+                regel(g.zelf)
+              ) : (
+                <li key={g.id} className="oa-stap">
+                  <button type="button" onClick={() => setPad({ procestype: tak.procestype.nummer, groep: g.id })}>
+                    <span className="oa-klasse-kop"><b>{g.id}</b> {g.naam}{g.omschrijving ? <> · {g.omschrijving}</> : null}</span>
+                    <span className="oa-klein">{g.uitwerkingen.length} {g.uitwerkingen.length === 1 ? "uitwerking" : "uitwerkingen"}{g.zelf ? " en het resultaat in het algemeen" : ""}</span>
+                  </button>
+                </li>
+              ),
+            )}
+          </ul>
+        </>
+      ) : (
+        <ul className="oa-klassen">
+          {groep.zelf && regel(groep.zelf, "In het algemeen: als geen uitwerking hieronder past")}
+          {groep.uitwerkingen.map((r) => regel(r))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function Classificeren({ adapter, verbinding, stand, setStand, type, wie, klassen, uit, melding, fout }: Props) {
   const object = stand.object!;
   const huidig = object.classificatie ?? null;
@@ -46,6 +117,11 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   const [voorstellen, setVoorstellen] = useState<Klassevoorstel[] | null>(null);
   const [bezig, setBezig] = useState(false);
   const [fouten, setFouten] = useState<Record<string, string>>({});
+  // Kiezen in stappen: procestype, dan het generieke resultaat (met uitwerkingen). Begin bij de huidige klasse.
+  const [pad, setPad] = useState<{ procestype: number | null; groep: string | null }>(() => {
+    const r = klassen?.selectielijst?.resultaten.find((x) => x.id === huidig?.resultaat);
+    return r ? { procestype: r.procestype, groep: r.generiek ?? (klassen!.selectielijst!.resultaten.some((x) => x.generiek === r.id) ? r.id : null) } : { procestype: null, groep: null };
+  });
 
   const lijst = klassen?.selectielijst;
   const model = klassen?.model;
@@ -71,6 +147,7 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   const procestype = useMemo(() => new Map((lijst?.procestypen ?? []).map((p) => [p.nummer, p])), [lijst]);
   const gekozen = lijst?.resultaten.find((r) => r.id === keuze);
   const gevonden = useMemo(() => (lijst ? classificeren.zoek(lijst.resultaten, lijst.procestypen, vraag) : []), [lijst, vraag]);
+  const takken = useMemo(() => (lijst ? classificeren.boom(lijst.resultaten, lijst.procestypen) : []), [lijst]);
 
   if (!klassen) return <Paragraph small>Het classificatiemodel wordt geladen…</Paragraph>;
   if (!model || !lijst) {
@@ -92,8 +169,13 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
 
   const kies = (id: string) => {
     setKeuze(id);
-    setVraag("");
     setFouten({});
+    // Na kiezen uit de zoekresultaten: de stappen tonen waar de klasse staat.
+    const r = lijst?.resultaten.find((x) => x.id === id);
+    if (r && vraag) {
+      setPad({ procestype: r.procestype, groep: r.generiek ?? (lijst!.resultaten.some((x) => x.generiek === r.id) ? r.id : null) });
+      setVraag("");
+    }
   };
 
   const legVast = async () => {
@@ -158,12 +240,21 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
           ) : (
             <ul className="oa-klassen">{voorstellen.map((v) => regel(v.resultaat, `Op grond van: ${v.woorden.join(", ")}`))}</ul>
           )}
+          <Heading3>Zelf kiezen</Heading3>
           <FormField
             label={<label htmlFor="oa-klasse-zoek">Zoek in de selectielijst</label>}
-            description="Op nummer (12.2) of op woorden (vergunning kappen)."
-            input={<Textbox id="oa-klasse-zoek" value={vraag} onChange={(e) => setVraag(e.target.value)} autoComplete="off" />}
+            description="Op nummer (12.2) of op woorden (vergunning kappen). Of kies hieronder in stappen."
+            input={<Textbox id="oa-klasse-zoek" type="search" value={vraag} onChange={(e) => setVraag(e.target.value)} autoComplete="off" />}
           />
-          {vraag && (gevonden.length ? <ul className="oa-klassen">{gevonden.map((r) => regel(r))}</ul> : <Paragraph small>Niets gevonden.</Paragraph>)}
+          {vraag ? (
+            gevonden.length ? (
+              <ul className="oa-klassen">{gevonden.map((r) => regel(r, `${r.procestype}. ${procestype.get(r.procestype)?.naam ?? ""}`))}</ul>
+            ) : (
+              <Paragraph small>Niets gevonden.</Paragraph>
+            )
+          ) : (
+            <Stappen takken={takken} pad={pad} setPad={setPad} regel={regel} />
+          )}
         </>
       )}
 

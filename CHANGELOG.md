@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.14.0 — 2026-11-19
+
+- **Classificeren: kiezen in stappen.** Onder de voorstellen van de assistent staat *Zelf kiezen*: eerst een zoekbalk, daaronder de selectielijst in stappen zoals hij is ingedeeld. Eerst het procestype (met het aantal klassen), dan het resultaat; heeft dat uitwerkingen, dan daarna de uitwerking, of het resultaat *in het algemeen* als geen uitwerking past. Een kruimelpad bovenaan om terug te gaan.
+- Zoeken toont bij elke klasse het procestype; na kiezen uit de zoekresultaten tonen de stappen waar de klasse staat. Het paneel opent de stappen bij de klasse die al is vastgelegd.
+- Hangt af van oa-kern 0.10.0.
+
 ## 0.13.0 — 2026-11-18
 
 - **Toegankelijkheid: Alles herstellen.** Bij twee of meer herstelbare bevindingen staat er een knop *Alles herstellen (n)*. Hij neemt alle voorstellen over, en de antwoorden die al zijn ingevuld; een afbeelding zonder alternatieve tekst slaat hij over. Daarna beoordeelt het paneel opnieuw (hoogstens drie rondes, voor bevindingen die binnen een andere lagen) en zegt hoeveel er hersteld is en hoeveel er over zijn.
