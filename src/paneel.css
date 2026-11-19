@@ -331,3 +331,5 @@
 .oa-details summary { cursor: pointer; font-size: 0.875rem; }
 .oa-pii-voorstel { margin: -4px 0 8px; padding: 6px 8px; border-inline-start: 3px solid var(--oa-accent); background: var(--oa-vlak); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .oa-pii-voorstel p { margin: 0; }
+.oa-toen { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.oa-toen p { margin: 0; }

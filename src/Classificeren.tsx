@@ -45,6 +45,8 @@ interface Props {
   type: Objecttype | null;
   wie: WieBenIk;
   klassen: ClassificatieAntwoord | null;
+  /** Bij een classificatie met een oudere versie van het model: die versie (null zolang ze wordt geladen). */
+  klassenToen?: ClassificatieAntwoord | null;
   uit: boolean;
   melding: (m: { soort: "ok" | "info" | "error" | "warning"; tekst: string }) => void;
   fout: (e: unknown) => void;
@@ -126,7 +128,25 @@ function Stappen({ takken, pad, setPad, regel }: {
   );
 }
 
-export function Classificeren({ adapter, verbinding, stand, setStand, type, wie, klassen, uit, melding, fout }: Props) {
+/**
+ * Een vastgelegde classificatie toont het paneel met de versie van het model
+ * waarmee ze is vastgelegd: dezelfde attributen, keuzes en klassen als toen.
+ * Opnieuw classificeren gaat met het model dat nu geldt.
+ */
+export function Classificeren(props: Props) {
+  const huidig = props.stand.object?.classificatie ?? null;
+  const nu = props.klassen?.model?.versie;
+  const [opnieuw, setOpnieuw] = useState(false);
+  const ouder = !!huidig && nu !== undefined && huidig.modelversie !== nu && !opnieuw;
+  if (ouder && props.klassenToen === null) return <Paragraph small>De classificatie wordt geladen zoals ze is vastgelegd…</Paragraph>;
+  // Is die versie niet te lezen, dan het model van nu.
+  if (ouder && props.klassenToen?.model && props.klassenToen.selectielijst) {
+    return <Formulier key="toen" {...props} klassen={props.klassenToen} toen={{ versie: huidig!.modelversie, nu: nu!, opnieuw: () => setOpnieuw(true) }} />;
+  }
+  return <Formulier key="nu" {...props} />;
+}
+
+function Formulier({ adapter, verbinding, stand, setStand, type, wie, klassen, uit, melding, fout, toen }: Props & { toen?: { versie: number; nu: number; opnieuw: () => void } }) {
   const object = stand.object!;
   const huidig = object.classificatie ?? null;
   const [keuze, setKeuze] = useState<string>(huidig?.resultaat ?? "");
@@ -146,7 +166,9 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
 
   const lijst = klassen?.selectielijst;
   const model = klassen?.model;
-  const alleenLezen = !!object.vergrendeld && !wie.rollen.includes("vrijgever");
+  const vergrendeld = !!object.vergrendeld && !wie.rollen.includes("vrijgever");
+  // Met het model van toen: alleen tonen. Wijzigen kan alleen met het model van nu.
+  const alleenLezen = vergrendeld || !!toen;
 
   // De assistent leest het stuk en stelt drie klassen voor.
   useEffect(() => {
@@ -223,7 +245,10 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
   const bewaren = gekozen
     ? bepaalBewaren({ ...model.config, afwijkingen: [] }, { ...lijst, bron: "", resultaten: lijst.resultaten }, { resultaat: gekozen.id, ...(einddatum ? { einddatumProcesobject: einddatum } : {}) }, object.statusdata ?? {})
     : null;
+  // Vastgelegd met een oudere versie van het model: opnieuw vastleggen met deze versie kan ook zonder iets te wijzigen.
+  const andereVersie = !!huidig && huidig.modelversie !== model.versie;
   const gewijzigd =
+    andereVersie ||
     keuze !== (huidig?.resultaat ?? "") ||
     JSON.stringify(attributen) !== JSON.stringify(huidig?.attributen ?? {}) ||
     einddatum !== (huidig?.einddatumProcesobject ?? "") ||
@@ -282,7 +307,15 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
 
   return (
     <section className="oa-sectie" aria-label="Classificeren">
-      {alleenLezen && (
+      {toen && (
+        <div className="oa-kader oa-kader-rustig oa-toen">
+          <Paragraph small>
+            Vastgelegd met versie {toen.versie} van het classificatiemodel{model?.config.naam ? ` (${model.config.naam})` : ""}. Je ziet het zoals het toen is vastgelegd. Nu geldt versie {toen.nu}.
+          </Paragraph>
+          {!vergrendeld && <SubtleButton onClick={toen.opnieuw}>Opnieuw classificeren met versie {toen.nu}</SubtleButton>}
+        </div>
+      )}
+      {vergrendeld && (
         <Alert type="info">
           <Paragraph>Dit stuk is {object.vergrendeld!.status} en vergrendeld. Alleen een vrijgever kan de classificatie nog wijzigen.</Paragraph>
         </Alert>

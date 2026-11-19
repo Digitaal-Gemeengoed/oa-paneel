@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.18.0 — 2026-11-19
+
+**Een vastgelegde classificatie met het model van toen.**
+- Is een stuk geclassificeerd met een oudere versie van het classificatiemodel, dan toont Classificeren het met die versie: dezelfde attributen, keuzes en klassen als toen, alleen te lezen. Een melding noemt beide versies.
+- "Opnieuw classificeren met versie N" opent het formulier met het model van nu. Vastleggen kan dan ook zonder iets te wijzigen; attributen die het nieuwe model niet meer heeft, vervallen.
+- De kop noemt de naam van de versie waarmee het stuk is vastgelegd.
+- Is de oude versie niet te lezen, dan toont het paneel het model van nu, zoals voorheen.
+
 ## 0.17.0 — 2026-11-19
 
 **Standaardattributen in Classificeren.**

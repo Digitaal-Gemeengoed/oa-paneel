@@ -130,6 +130,8 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
   const [afwijking, setAfwijking] = useState<"gelijk" | "afwijkend" | "onbekend">("onbekend");
   /** Het classificatiemodel: eerst alleen het model, met de selectielijst zodra Classificeren opent. */
   const [klassen, setKlassen] = useState<ClassificatieAntwoord | null>(null);
+  // Een vastgelegde classificatie met een oudere versie van het model: die versie, om het te tonen zoals het is vastgelegd.
+  const [klassenToen, setKlassenToen] = useState<{ versie: number; antwoord: ClassificatieAntwoord } | null>(null);
   /** Opstarten: hoeveel van de vragen aan de server al beantwoord zijn (voor de voortgangsbalk). */
   const [geladen, setGeladen] = useState(0);
 
@@ -215,6 +217,21 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
       weg = true;
     };
   }, [actief, klassen, wie, verbinding, fout]);
+
+  const toenVersie = stand?.object?.classificatie?.modelversie;
+  const nuVersie = klassen?.selectielijst ? klassen.model?.versie : undefined;
+  useEffect(() => {
+    if (actief !== "clas" || !toenVersie || nuVersie === undefined || toenVersie === nuVersie || klassenToen?.versie === toenVersie) return;
+    let weg = false;
+    verbinding.classificatieVersie(toenVersie).then(
+      (k) => weg || setKlassenToen({ versie: toenVersie, antwoord: k }),
+      // Niet te lezen: dan toont het paneel het model van nu.
+      () => weg || setKlassenToen({ versie: toenVersie, antwoord: { model: null } }),
+    );
+    return () => {
+      weg = true;
+    };
+  }, [actief, toenVersie, nuVersie, klassenToen, verbinding]);
 
   const velden: Veld[] = useMemo(() => (type ? metadateren.velden(type) : []), [type]);
   const aard: Aard | null = stand?.object ? (stand.object.aard ?? "zakelijk") : aardKeuze;
@@ -461,7 +478,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
             )}
             {actief === "clas" && klasModel && !persoonlijk && (
               <p className="oa-model" title="Het classificatiemodel van de gemeente, ingesteld in het beheerportaal.">
-                {classificatiemodelnaam(klasModel.config)} · versie {klasVersie}
+                {classificatiemodelnaam(klasVersie !== klasModel.versie && klassenToen?.versie === klasVersie && klassenToen?.antwoord.model ? klassenToen.antwoord.model.config : klasModel.config)} · versie {klasVersie}
                 {klasVersie !== klasModel.versie && <> · nu geldt versie {klasModel.versie}</>}
               </p>
             )}
@@ -916,6 +933,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
               type={type}
               wie={wie}
               klassen={klassen?.selectielijst ? klassen : null}
+              klassenToen={klassenToen && klassenToen.versie === toenVersie ? klassenToen.antwoord : null}
               uit={uit}
               melding={(m) => setMelding(m)}
               fout={fout}
