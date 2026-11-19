@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, FormField, Paragraph, PrimaryActionButton, Select, SelectOption, StatusBadge, SubtleButton, Textbox, Heading3 } from "@utrecht/component-library-react";
-import { bepaalBewaren, duurInWoorden, isOndersteunend, ondersteunendeKlassen, rolWaarden, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
-import { classificeren, type ClassificatieAntwoord, type Klasse, type Klassetak, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
+import { attribuutGeldt, bepaalBewaren, duurInWoorden, isOndersteunend, ondersteunendeKlassen, rolWaarden, voorstelPersoonsgegevens, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
+import { anonimiseren, classificeren, type ClassificatieAntwoord, type Klasse, type Klassetak, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
 
 /** "vernietigen na 10 jaar" of "blijvend bewaren". */
 export function termijnTekst(r: Klasse): string {
@@ -14,6 +14,19 @@ export function termijnTekst(r: Klasse): string {
 export function klasseKop(r: Klasse): string {
   if (!isOndersteunend(r.id)) return `${r.id} ${r.naam}`;
   return r.procestype === 0 && r.omschrijving && r.omschrijving !== "zonder archiefwaarde" ? `Ondersteunend · ${r.omschrijving} ${r.naam}` : "Ondersteunend, zonder archiefwaarde";
+}
+
+const PII_NAAM: Record<string, [string, string]> = {
+  naam: ["naam", "namen"], adres: ["adres", "adressen"], bsn: ["BSN", "BSN's"], iban: ["IBAN", "IBAN's"], telefoon: ["telefoonnummer", "telefoonnummers"],
+  "e-mail": ["e-mailadres", "e-mailadressen"], kenteken: ["kenteken", "kentekens"], geboortedatum: ["geboortedatum", "geboortedata"],
+};
+/** "3 namen, 1 BSN" (zaaknummers tellen niet: dat zijn geen persoonsgegevens). */
+function gevondenTekst(soorten: Record<string, number>): string {
+  return Object.entries(soorten)
+    .filter(([s]) => s !== "zaaknummer")
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `${n} ${(PII_NAAM[s] ?? [s, s])[n === 1 ? 0 : 1]}`)
+    .join(", ");
 }
 
 function platteTekst(html: string): string {
@@ -152,6 +165,27 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
     };
   }, [adapter, lijst, type, object.metadata]);
 
+  // Het standaardattribuut persoonsgegevens: de assistent zoekt ze en stelt een keuze voor.
+  const metPii = !!model?.config.attributen.some((a) => a.standaard === "persoonsgegevens" && a.koppeling && Object.keys(a.koppeling).length);
+  const [pii, setPii] = useState<Record<string, number> | "bezig" | "fout" | null>(null);
+  useEffect(() => {
+    if (!metPii || alleenLezen) return;
+    let weg = false;
+    setPii("bezig");
+    anonimiseren
+      .vind(adapter, verbinding)
+      .then((g) => {
+        if (weg) return;
+        const tel: Record<string, number> = {};
+        for (const t of g.treffers) tel[t.soort] = (tel[t.soort] ?? 0) + 1;
+        setPii(tel);
+      })
+      .catch(() => !weg && setPii("fout"));
+    return () => {
+      weg = true;
+    };
+  }, [adapter, verbinding, metPii, alleenLezen, object.identificatie]);
+
   // Hoe de andere stukken in dezelfde zaak (of hetzelfde dossier) zijn geclassificeerd.
   const [zaak, setZaak] = useState<ZaakClassificatie | null>(null);
   useEffect(() => {
@@ -213,7 +247,9 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
     try {
       const s = await classificeren.legVast(verbinding, stand, {
         resultaat: keuze,
-        ...(Object.keys(attributen).length ? { attributen: Object.fromEntries(Object.entries(attributen).filter(([, w]) => w !== "")) } : {}),
+        ...(Object.keys(attributen).length
+          ? { attributen: Object.fromEntries(Object.entries(attributen).filter(([k, w]) => w !== "" && model.config.attributen.some((a) => a.sleutel === k && attribuutGeldt(a, gekozen?.waardering)))) }
+          : {}),
         ...(einddatum ? { einddatumProcesobject: einddatum } : {}),
         ...(isOndersteunend(keuze) && toetsvragen.length ? { toetsvragenBevestigd: bevestigd } : {}),
       });
@@ -408,9 +444,11 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
               input={<Textbox id="oa-einddatum" type="date" value={einddatum} disabled={alleenLezen} onChange={(e) => setEinddatum(e.target.value)} />}
             />
           )}
-          {model.config.attributen.map((a) => (
+          {model.config.attributen.filter((a) => attribuutGeldt(a, gekozen.waardering)).map((a) => {
+            const voorstel = a.standaard === "persoonsgegevens" && pii && typeof pii === "object" ? voorstelPersoonsgegevens(a, Object.keys(pii)) : null;
+            return (
+            <Fragment key={a.sleutel}>
             <FormField
-              key={a.sleutel}
               label={<label htmlFor={`oa-attr-${a.sleutel}`}>{a.label}{a.verplicht ? " (verplicht)" : ""}</label>}
               description={a.beschrijving}
               invalid={!!fouten[a.sleutel]}
@@ -441,7 +479,27 @@ export function Classificeren({ adapter, verbinding, stand, setStand, type, wie,
                 )
               }
             />
-          ))}
+            {a.standaard === "persoonsgegevens" && !alleenLezen && pii !== null && (
+              <div className="oa-pii-voorstel" aria-live="polite">
+                {pii === "bezig" ? (
+                  <Paragraph small>De assistent zoekt persoonsgegevens in het stuk…</Paragraph>
+                ) : pii === "fout" ? (
+                  <Paragraph small>De assistent kon het stuk niet doorzoeken op persoonsgegevens. Kies zelf.</Paragraph>
+                ) : voorstel ? (
+                  <>
+                    <Paragraph small>
+                      Voorstel: <b>{voorstel.waarde}</b>. {voorstel.code === "geen" ? "De assistent vond geen persoonsgegevens." : `Gevonden: ${gevondenTekst(pii)}.`} Bijzondere of strafrechtelijke gegevens herkent de assistent niet; die kies je zelf.
+                    </Paragraph>
+                    {attributen[a.sleutel] !== voorstel.waarde && (
+                      <SubtleButton onClick={() => setAttributen((x) => ({ ...x, [a.sleutel]: voorstel.waarde }))}>Overnemen</SubtleButton>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            )}
+            </Fragment>
+            );
+          })}
           {bewaren && (
             <Paragraph small className="oa-bewaren">
               {bewaren.uitleg}
