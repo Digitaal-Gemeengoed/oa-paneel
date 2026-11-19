@@ -1,5 +1,14 @@
 # Wijzigingen
 
+## 0.15.0 — 2026-11-19
+
+Classificeren:
+
+- **Hoort bij zaak …**: heeft het stuk een zaaknummer (of een dossier), dan staat bovenaan hoe de andere stukken daarin zijn geclassificeerd, met aantallen. Eén klik neemt de klasse over, en ook de einddatum van het procesobject. Is dit het eerste stuk in de zaak, dan zegt het paneel dat de keuze het voorstel wordt voor de volgende.
+- **Geen onderdeel van een proces?** Staat het in het classificatiemodel aan, dan kan de medewerker een stuk als *ondersteunend, zonder archiefwaarde* classificeren, met de omschrijving, termijn en grondslag van de gemeente.
+- Zoeken en de voorstellen van de assistent gebruiken de eigen zoektermen van de gemeente.
+- Hangt af van oa-kern 0.11.0 en oa-contract 0.9.0.
+
 ## 0.14.0 — 2026-11-19
 
 - **Classificeren: kiezen in stappen.** Onder de voorstellen van de assistent staat *Zelf kiezen*: eerst een zoekbalk, daaronder de selectielijst in stappen zoals hij is ingedeeld. Eerst het procestype (met het aantal klassen), dan het resultaat; heeft dat uitwerkingen, dan daarna de uitwerking, of het resultaat *in het algemeen* als geen uitwerking past. Een kruimelpad bovenaan om terug te gaan.

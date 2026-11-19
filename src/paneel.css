@@ -289,6 +289,8 @@
 .oa-klasse button:focus-visible { outline: 2px solid var(--utrecht-focus-outline-color, #1a5ea8); outline-offset: 2px; }
 .oa-klasse.gekozen button { border-color: var(--utrecht-button-primary-action-background-color, #1a5ea8); box-shadow: inset 3px 0 0 var(--utrecht-button-primary-action-background-color, #1a5ea8); }
 .oa-klasse-kop { font-size: 0.875rem; }
+.oa-zaak { margin-bottom: 12px; }
+.oa-zaak h3 { margin-top: 0; }
 .oa-stappen { display: flex; flex-direction: column; gap: 8px; }
 .oa-kruimel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 0.8125rem; }
 .oa-kruimel button { background: none; border: 0; padding: 2px 0; font: inherit; color: var(--utrecht-link-color, #1a5ea8); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
