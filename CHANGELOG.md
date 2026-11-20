@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.20.0 — 2026-11-20
+
+- **Huisstijl van de inrichting.** Zolang het paneel niet weet bij welke gemeente je hoort (vóór het inloggen, of als de verbinding wegvalt), gebruikt het de huisstijl van de inrichting (`OA_HUISSTIJL` in oa-uitrol) in plaats van altijd het voorbeeldthema. Het vraagt die op bij `/api/huisstijl` van de integratielaag; zit de huisstijl niet in het paneel (alleen voorbeeld en Haarlem zitten erin), dan laadt het de CSS erbij. Na het inloggen gaat het thema van de gemeente voor.
+
 ## 0.19.1 — 2026-11-20
 
 - Metadateren: de keuze **Zakelijk / Persoonlijk** staat weer naast elkaar als schakelaar, zoals in het voorbeeld in het beheerportaal. De keuzelijst voor originele versies bij Anonimiseren gebruikte dezelfde klassenaam (`oa-keuze`) en zette de knoppen onder elkaar; die heet nu `oa-keuze-lijst`.

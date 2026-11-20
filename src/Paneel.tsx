@@ -44,6 +44,38 @@ import { Versies } from "./Versies";
 import { GEBEURTENIS, Icoon, isModule, MODULES, type ModuleId, type Opdracht } from "./modules";
 
 const THEMA: Record<string, string> = { haarlem: "haarlem-theme" };
+/** Thema's waarvan de tokens al in het paneel zitten (index.ts). */
+const MEEGELEVERD = new Set(["voorbeeld-theme", "haarlem-theme"]);
+
+/**
+ * De huisstijl van de inrichting (OA_HUISSTIJL), voor zolang het paneel niet
+ * weet bij welke gemeente je hoort. Zit de huisstijl niet in het paneel, dan
+ * laadt het de CSS van de integratielaag erbij.
+ */
+function useHuisstijl(basis: string): string {
+  const [klasse, setKlasse] = useState("voorbeeld-theme");
+  useEffect(() => {
+    let weg = false;
+    fetch(`${basis}/api/huisstijl`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h: { klasse?: string; css?: string | null } | null) => {
+        if (weg || !h?.klasse || !/^[a-z][a-z0-9-]{1,60}$/.test(h.klasse)) return;
+        if (!MEEGELEVERD.has(h.klasse) && h.css && !document.getElementById("oa-huisstijl")) {
+          const link = document.createElement("link");
+          link.id = "oa-huisstijl";
+          link.rel = "stylesheet";
+          link.href = `${basis}${h.css}`;
+          document.head.appendChild(link);
+        }
+        setKlasse(h.klasse);
+      })
+      .catch(() => {});
+    return () => {
+      weg = true;
+    };
+  }, [basis]);
+  return klasse;
+}
 
 /** "docx, 24 kB, met html-weergave": wat er van deze versie is bewaard. */
 function bestandsomschrijving(v: Versie): string {
@@ -109,6 +141,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
     [basis, sessie],
   );
 
+  const huisstijl = useHuisstijl(basis);
   const omgeving = adapter.werkomgeving();
   const [wie, setWie] = useState<WieBenIk | null>(null);
   // Het metadatamodel van dit stuk, en het model dat nu voor nieuwe stukken geldt.
@@ -487,7 +520,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
   );
 
   return (
-    <div className={`oa-paneel oa-knoppen-${knoppen} ${wie ? (THEMA[wie.gemeente] ?? "voorbeeld-theme") : "voorbeeld-theme"}`}>
+    <div className={`oa-paneel oa-knoppen-${knoppen} ${wie ? (THEMA[wie.gemeente] ?? huisstijl) : huisstijl}`}>
       {knoppen === "boven" && rij}
       <div className="oa-hoofd" role="tabpanel" id="oa-weergave" aria-labelledby={`oa-tab-${actief}`}>
         <header className="oa-kop">
