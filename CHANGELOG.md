@@ -1,5 +1,12 @@
 # Wijzigingen
 
+## 0.19.0 — 2026-11-20
+
+**Het classificatiemodel en de status van het stuk.**
+- Metadateren: kies je een andere status, dan staat bij het statusveld wat die vraagt (eerst classificeren, een attribuut dat dan verplicht is), of de hele zaak of het dossier meegaat en of bij die status een andere klasse past. Na het vastleggen noemt de melding hoeveel andere stukken de status ook kregen.
+- Classificeren: een attribuut dat vanaf een status verplicht is, zegt dat in de hulptekst en is verplicht zodra het stuk die status heeft.
+- Classificeren: klassen die het model bij een status voorstelt (zoals Afgebroken bij "geannuleerd"), binnen het procestype van het stuk. Heeft het stuk die status, dan bovenaan; anders ingeklapt onder "Als het stuk geannuleerd wordt".
+
 ## 0.18.0 — 2026-11-19
 
 **Een vastgelegde classificatie met het model van toen.**

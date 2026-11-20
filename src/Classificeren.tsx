@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, FormField, Paragraph, PrimaryActionButton, Select, SelectOption, StatusBadge, SubtleButton, Textbox, Heading3 } from "@utrecht/component-library-react";
-import { attribuutGeldt, bepaalBewaren, duurInWoorden, isOndersteunend, ondersteunendeKlassen, rolWaarden, voorstelPersoonsgegevens, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
+import { attribuutGeldt, attribuutVerplicht, bepaalBewaren, duurInWoorden, isOndersteunend, ondersteunendeKlassen, rolWaarden, voorstelPersoonsgegevens, type Adapter, type Objecttype, type WieBenIk, type ZaakClassificatie } from "@digitaalgemeengoed/oa-contract";
 import { anonimiseren, classificeren, type ClassificatieAntwoord, type Klasse, type Klassetak, type Klassevoorstel, type Stand, type Verbinding } from "@digitaalgemeengoed/oa-kern";
 
 /** "vernietigen na 10 jaar" of "blijvend bewaren". */
@@ -227,6 +227,24 @@ function Formulier({ adapter, verbinding, stand, setStand, type, wie, klassen, u
   const steun = model?.config.ondersteunend ?? null;
   const steunKlassen = useMemo<Klasse[]>(() => ondersteunendeKlassen(model?.config.ondersteunend), [model]);
   const toetsvragen = steun?.toetsvragen ?? [];
+  // De status van het stuk: sommige attributen zijn pas vanaf een status verplicht, en bij een status kan het model andere klassen voorstellen.
+  const status = object.status ?? null;
+  // Per status uit het model de klassen die erbij horen (zoals Afgebroken bij "geannuleerd"),
+  // binnen het procestype van het stuk: de gekozen of vastgelegde klasse, anders die van de zaak of het eerste voorstel.
+  // Ook voor een status die het stuk nog niet heeft: wie een stuk wil annuleren, classificeert het eerst.
+  const bijStatus = useMemo(() => {
+    if (!lijst || !model?.config.statusKlassen?.length) return [];
+    const basis = [keuze, huidig?.resultaat, zaak?.klassen[0]?.resultaat, voorstellen?.[0]?.resultaat.id].find((id) => id && !isOndersteunend(id));
+    const pt = basis ? lijst.resultaten.find((r) => r.id === basis)?.procestype : undefined;
+    if (pt === undefined) return [];
+    return model.config.statusKlassen
+      .map((k) => {
+        const gewenst = new Set(k.namen.map((n) => n.trim().toLowerCase()));
+        return { status: k.status, nu: k.status === status, klassen: lijst.resultaten.filter((r) => r.procestype === pt && gewenst.has(r.naam.toLowerCase())) };
+      })
+      .filter((k) => k.klassen.length && !k.klassen.some((r) => r.id === huidig?.resultaat))
+      .sort((a, b) => Number(b.nu) - Number(a.nu));
+  }, [model, status, lijst, keuze, huidig, zaak, voorstellen]);
   const klasseVan = (id: string): Klasse | undefined => (isOndersteunend(id) ? steunKlassen.find((k) => k.id === id) : lijst?.resultaten.find((r) => r.id === id));
   const gekozen = klasseVan(keuze);
   const gevonden = useMemo(() => (lijst ? classificeren.zoek(lijst.resultaten, lijst.procestypen, vraag) : []), [lijst, vraag]);
@@ -331,6 +349,20 @@ function Formulier({ adapter, verbinding, stand, setStand, type, wie, klassen, u
 
       {!alleenLezen && (
         <>
+          {bijStatus.map((b) =>
+            b.nu ? (
+              <div key={b.status} className="oa-kader oa-status-klassen">
+                <Heading3>Het stuk is {b.status}</Heading3>
+                <Paragraph small>Bij die status stelt het classificatiemodel {b.klassen.length === 1 ? "deze klasse" : "een van deze klassen"} voor. Kies zelf of die beter past.</Paragraph>
+                <ul className="oa-klassen">{b.klassen.map((r) => regel(r, `Bij de status ${b.status}`))}</ul>
+              </div>
+            ) : (
+              <details key={b.status} className="oa-status-klassen oa-status-als">
+                <summary>Als het stuk {b.status} wordt: {b.klassen.map((r) => r.naam).filter((n, i, a) => a.indexOf(n) === i).join(" of ")}</summary>
+                <ul className="oa-klassen">{b.klassen.map((r) => regel(r, `Bij de status ${b.status}`))}</ul>
+              </details>
+            ),
+          )}
           {zaak && (
             <div className="oa-kader oa-zaak">
               <Heading3>Hoort bij {zaak.rol === "zaak" ? "zaak" : "dossier"} {zaak.waarde}</Heading3>
@@ -482,8 +514,8 @@ function Formulier({ adapter, verbinding, stand, setStand, type, wie, klassen, u
             return (
             <Fragment key={a.sleutel}>
             <FormField
-              label={<label htmlFor={`oa-attr-${a.sleutel}`}>{a.label}{a.verplicht ? " (verplicht)" : ""}</label>}
-              description={a.beschrijving}
+              label={<label htmlFor={`oa-attr-${a.sleutel}`}>{a.label}{attribuutVerplicht(a, status) ? " (verplicht)" : ""}</label>}
+              description={[a.beschrijving, !attribuutVerplicht(a, status) && a.verplichtBij?.length ? `Verplicht zodra het stuk ${a.verplichtBij.join(" of ")} is.` : ""].filter(Boolean).join(" ") || undefined}
               invalid={!!fouten[a.sleutel]}
               errorMessage={fouten[a.sleutel]}
               input={

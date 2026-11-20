@@ -59,6 +59,7 @@
 .oa-paneel .utrecht-form-field > *, .oa-paneel .utrecht-form-field__label, .oa-paneel .utrecht-form-field__description { margin-block: 0; }
 .oa-paneel .utrecht-form-field__description { font-size: 0.8125rem; }
 .oa-voorstel { display: block; margin-top: 2px; }
+.oa-status-gevolg { display: block; margin-top: 4px; }
 .oa-paneel .utrecht-form-field + .utrecht-form-field { margin-top: 8px; }
 .oa-paneel .utrecht-data-list { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
 .oa-paneel .utrecht-data-list__item { display: contents; }
@@ -291,6 +292,10 @@
 .oa-klasse-kop { font-size: 0.875rem; }
 .oa-zaak { margin-bottom: 12px; }
 .oa-zaak h3 { margin-top: 0; }
+.oa-status-klassen { margin-bottom: 12px; }
+.oa-status-klassen h3 { margin-top: 0; }
+.oa-status-als { margin-bottom: 12px; }
+.oa-status-als summary { cursor: pointer; font-size: 0.875rem; }
 /* Ondersteunend: eerst de toetsvragen, dan de categorie. */
 .oa-steun { display: flex; flex-direction: column; gap: 8px; }
 .oa-toets ol { margin: 4px 0 8px; padding-inline-start: 1.4em; font-size: 0.8125rem; display: flex; flex-direction: column; gap: 3px; }

@@ -18,7 +18,7 @@ import {
   Textarea,
   Textbox,
 } from "@utrecht/component-library-react";
-import { classificatiemodelnaam, heeftVermogen, modelVan, rolWaarden, type Aard, type Adapter, type Bevinding, type Gebeurtenis, type Objecttype, type Versie, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
+import { classificatiemodelnaam, heeftVermogen, modelVan, ontbreektVoorStatus, rollenVan, rolWaarden, type Selectielijst, type Aard, type Adapter, type Bevinding, type Gebeurtenis, type Objecttype, type Versie, type WieBenIk } from "@digitaalgemeengoed/oa-contract";
 import {
   metadateren,
   toegankelijkheid,
@@ -207,7 +207,8 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
   }, [adapter, verbinding, fout, laadGeschiedenis]);
 
   useEffect(() => {
-    if (actief !== "clas" || klassen?.selectielijst || !wie) return;
+    // Ook bij Metadateren: wat een nieuwe status vraagt, staat in het classificatiemodel.
+    if ((actief !== "clas" && actief !== "meta") || klassen?.selectielijst || !wie || (actief === "meta" && !stand?.object)) return;
     let weg = false;
     verbinding.classificatie().then(
       (k) => weg || setKlassen(k),
@@ -216,7 +217,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
     return () => {
       weg = true;
     };
-  }, [actief, klassen, wie, verbinding, fout]);
+  }, [actief, klassen, wie, verbinding, fout, stand?.object]);
 
   const toenVersie = stand?.object?.classificatie?.modelversie;
   const nuVersie = klassen?.selectielijst ? klassen.model?.versie : undefined;
@@ -234,6 +235,24 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
   }, [actief, toenVersie, nuVersie, klassenToen, verbinding]);
 
   const velden: Veld[] = useMemo(() => (type ? metadateren.velden(type) : []), [type]);
+  // Een andere status kiezen: wat het classificatiemodel daarvoor vraagt, en of hij naar de hele zaak gaat.
+  const statusSleutel = type ? rollenVan(type.schema).status : undefined;
+  const nieuweStatus = statusSleutel ? String(metadata[statusSleutel] ?? "") : "";
+  const statusGevolg = useMemo(() => {
+    const config = klassen?.model?.config;
+    const huidige = stand?.object?.status ?? "";
+    if (!config || !klassen?.selectielijst || !stand?.object || !nieuweStatus || nieuweStatus === huidige) return null;
+    const ontbreekt = ontbreektVoorStatus(config, klassen.selectielijst as unknown as Selectielijst, nieuweStatus, stand.object.classificatie ?? null);
+    const rollen = type ? rollenVan(type.schema) : {};
+    const zaak = rollen.zaak ? String(metadata[rollen.zaak] ?? "").trim() : "";
+    const dossier = rollen.dossier ? String(metadata[rollen.dossier] ?? "").trim() : "";
+    const door = config.doorgevenBij?.includes(nieuweStatus) && (zaak || dossier) ? (zaak ? `zaak ${zaak}` : `dossier ${dossier}`) : null;
+    // Stelt het model bij die status andere klassen voor, dan staat dat bij Classificeren.
+    const klassen2 = config.statusKlassen?.find((k) => k.status === nieuweStatus)?.namen ?? [];
+    const huidigeNaam = stand.object.classificatie ? klassen.selectielijst.resultaten.find((r) => r.id === stand.object!.classificatie!.resultaat)?.naam : undefined;
+    const andereKlasse = klassen2.length > 0 && !klassen2.some((n) => n.toLowerCase() === huidigeNaam?.toLowerCase()) ? klassen2 : null;
+    return { ontbreekt, door, andereKlasse };
+  }, [klassen, stand?.object, nieuweStatus, metadata, type]);
   const aard: Aard | null = stand?.object ? (stand.object.aard ?? "zakelijk") : aardKeuze;
   const persoonlijk = aard === "persoonlijk";
   const ontbreekt = type && !persoonlijk ? metadateren.bevindingen(type, metadata) : [];
@@ -299,7 +318,13 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
       setFouten({});
       const s = await legMetadataVast(verbinding, stand!, metadata, type ?? undefined, adapter);
       setStand(s);
-      setMelding({ soort: "ok", tekst: "De metadata is vastgelegd." });
+      const d = s.object?.doorgegeven;
+      setMelding({
+        soort: "ok",
+        tekst: d && d.aantal > 0
+          ? `De metadata is vastgelegd. ${d.aantal === 1 ? "Eén ander stuk" : `Ook ${d.aantal} andere stukken`} in ${d.rol} ${d.waarde} ${d.aantal === 1 ? "is" : "zijn"} nu ${d.status}.`
+          : "De metadata is vastgelegd.",
+      });
       await laadGeschiedenis(s);
     });
 
@@ -758,6 +783,13 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
                 description={
                   <>
                     {v.beschrijving}
+                    {v.naam === statusSleutel && statusGevolg && (statusGevolg.ontbreekt.length > 0 || statusGevolg.door || statusGevolg.andereKlasse) && (
+                      <span className={`oa-status-gevolg${statusGevolg.ontbreekt.length ? " oa-waarschuwing-tekst" : ""}`}>
+                        {statusGevolg.ontbreekt.length > 0 ? `${statusGevolg.ontbreekt.join(" ")} ` : ""}
+                        {statusGevolg.andereKlasse && `Bij ${nieuweStatus} past meestal een andere klasse (${statusGevolg.andereKlasse.join(", ")}); kijk bij Classificeren. `}
+                        {statusGevolg.door && `Alle stukken in ${statusGevolg.door} krijgen dan de status ${nieuweStatus}, behalve stukken die al vergrendeld zijn. Is een ervan nog niet klaar, dan gaat het niet door.`}
+                      </span>
+                    )}
                     {voorstellen[v.naam] && !metadata[v.naam] && (
                       <span className="oa-voorstel">
                         Voorstel: <q>{voorstellen[v.naam]}</q>{" "}
