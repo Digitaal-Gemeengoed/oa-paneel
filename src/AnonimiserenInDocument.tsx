@@ -396,7 +396,7 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
               ))}
             </select>
           </label>
-          <fieldset className="oa-keuze">
+          <fieldset className="oa-keuze-lijst">
             <legend className="oa-klein">Originele versies</legend>
             <label className="oa-klein">
               <input type="radio" name="oa-originelen" checked={originelen === "beperken"} onChange={() => setOriginelen("beperken")} /> Alleen nog voor informatiebeheer

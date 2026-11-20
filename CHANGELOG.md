@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.19.1 — 2026-11-20
+
+- Metadateren: de keuze **Zakelijk / Persoonlijk** staat weer naast elkaar als schakelaar, zoals in het voorbeeld in het beheerportaal. De keuzelijst voor originele versies bij Anonimiseren gebruikte dezelfde klassenaam (`oa-keuze`) en zette de knoppen onder elkaar; die heet nu `oa-keuze-lijst`.
+
 ## 0.19.0 — 2026-11-20
 
 **Het classificatiemodel en de status van het stuk.**

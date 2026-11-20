@@ -256,7 +256,7 @@
 .oa-grondslag select { width: 100%; max-width: 100%; font: inherit; text-overflow: ellipsis; }
 .oa-grondslag .oa-let-op { color: var(--oa-waarschuwing, #8a5300); }
 .oa-anon-status { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.oa-keuze { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.oa-keuze-lijst { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .oa-versies { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .oa-versies li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
 .oa-versie-kop { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
