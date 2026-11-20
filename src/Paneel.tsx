@@ -27,6 +27,7 @@ import {
   legVersieVast,
   maakZakelijk,
   anonimiseren,
+  eigenschappen,
   registreer,
   vergelijkMetLaatsteVersie,
   Verbinding,
@@ -150,6 +151,8 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
   const [stand, setStand] = useState<Stand | null>(null);
   const [metadata, setMetadata] = useState<Record<string, string>>({});
   const [voorstellen, setVoorstellen] = useState<Record<string, string>>({});
+  /** Meer dan één regel met het opmaakprofiel Titel: eerst opschonen, dan pas een voorstel. */
+  const [meerdereTitels, setMeerdereTitels] = useState(false);
   const [fouten, setFouten] = useState<Record<string, string>>({});
   const [bevindingen, setBevindingen] = useState<Bevinding[] | null>(null);
   const [antwoorden, setAntwoorden] = useState<Record<string, string>>({});
@@ -226,7 +229,11 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
         setStand(s);
         const huidig = (s.object?.metadata ?? {}) as Record<string, string>;
         setMetadata(huidig);
-        setVoorstellen(metadateren.suggesties(inhoud, huidig, t));
+        // Voorstellen uit de inhoud, de documenteigenschappen en wie is ingelogd.
+        const eig = await eigenschappen.lees(adapter);
+        if (weg) return;
+        setMeerdereTitels(eigenschappen.titelRegels(inhoud).length > 1);
+        setVoorstellen(metadateren.suggesties(inhoud, huidig, t, { eigenschappen: eig, wie: w }));
         if (s.terugval) setMelding({ soort: "info", tekst: s.terugval });
         if (s.object) setAfwijking(await vergelijkMetLaatsteVersie(s, inhoud));
         await laadGeschiedenis(s);
@@ -823,6 +830,11 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
                         {statusGevolg.door && `Alle stukken in ${statusGevolg.door} krijgen dan de status ${nieuweStatus}, behalve stukken die al vergrendeld zijn. Is een ervan nog niet klaar, dan gaat het niet door.`}
                       </span>
                     )}
+                    {meerdereTitels && v.rol === "titel" && !metadata[v.naam] && (
+                      <span className="oa-voorstel">
+                        Er staan meer regels met het opmaakprofiel Titel. Ruim die eerst op bij Toegankelijkheid; dan stelt de assistent de titel voor.
+                      </span>
+                    )}
                     {voorstellen[v.naam] && !metadata[v.naam] && (
                       <span className="oa-voorstel">
                         Voorstel: <q>{voorstellen[v.naam]}</q>{" "}
@@ -891,7 +903,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
                           onChange={(e) => setAntwoorden((a) => ({ ...a, [b.id]: e.target.value }))}
                         />
                       )}
-                      {(b.voorstel?.vervanging || b.voorstel?.vraag) && b.plek?.pad && (
+                      {(b.voorstel?.vervanging || b.voorstel?.vraag || b.voorstel?.eigenschap) && (b.plek?.pad || b.voorstel?.eigenschap) && (
                         <SecondaryActionButton
                           onClick={() => doeHerstel(b)}
                           disabled={bezig !== null || (!!b.voorstel?.vraag && b.voorstel.vraag.veld !== "alt" && !antwoorden[b.id])}
@@ -922,6 +934,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
             }}
             niveau={wie?.niveau ?? 0}
             beheerder={!!wie?.rollen.includes("beheerder")}
+            organisatie={wie ? eigenschappen.organisatieNaam(wie.gemeente) : undefined}
             klik={piiKlik}
             selectieVerzoek={selectieVerzoek}
             nietBeginnen={!geregistreerd ? "Leg het stuk eerst vast (bij Metadateren): anonimiseren maakt een nieuwe versie, en het origineel blijft bewaard." : null}

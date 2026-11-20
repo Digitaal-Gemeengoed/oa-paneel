@@ -15,6 +15,8 @@ export interface AnonimiserenInDocumentProps {
   zetStand: (s: Stand) => void;
   niveau: Ppl;
   beheerder: boolean;
+  /** Wordt de auteur in de documenteigenschappen van de geanonimiseerde versie. */
+  organisatie?: string;
   /** Een klik op een plaatshouder in het document (telt op bij elke klik). */
   klik: { plek: string; n: number } | null;
   /** "Anonimiseer selectie" uit de werkbalk van de werkomgeving (telt op). */
@@ -150,7 +152,7 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
 
   const bevestig = () =>
     doe("anon-bevestigen", async () => {
-      const r = await anonimiseren.bevestigInDocument(adapter, verbinding, stand, sessie!);
+      const r = await anonimiseren.bevestigInDocument(adapter, verbinding, stand, sessie!, p.organisatie);
       p.zetStand(r.stand);
       setSessie(null);
       setOpen(null);
