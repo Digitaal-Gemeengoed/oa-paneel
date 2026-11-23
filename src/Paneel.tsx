@@ -578,7 +578,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
           <>
             {wie && (
               <Paragraph small>
-                {wie.naam} · {wie.gemeente} · in {omgeving.naam}
+                {wie.naam} · {wie.gemeenteNaam ?? wie.gemeente} · in {omgeving.naam}
               </Paragraph>
             )}
             <section className="oa-sectie" aria-labelledby="oa-stuk">
@@ -934,7 +934,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
             }}
             niveau={wie?.niveau ?? 0}
             beheerder={!!wie?.rollen.includes("beheerder")}
-            organisatie={wie ? eigenschappen.organisatieNaam(wie.gemeente) : undefined}
+            organisatie={wie ? (wie.gemeenteNaam ?? eigenschappen.organisatieNaam(wie.gemeente)) : undefined}
             klik={piiKlik}
             selectieVerzoek={selectieVerzoek}
             nietBeginnen={!geregistreerd ? "Leg het stuk eerst vast (bij Metadateren): anonimiseren maakt een nieuwe versie, en het origineel blijft bewaard." : null}

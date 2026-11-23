@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.22.0 — 2026-11-23
+
+- De kop toont de naam van de gemeente ("Gemeente Haarlem") in plaats van de code. Anonimiseren in het document gebruikt die naam als auteur.
+- oa-contract 0.14.0, oa-kern 0.14.0.
+
 ## 0.21.0 — 2026-11-20
 
 - **Documenteigenschappen.** Metadateren leest de documenteigenschappen en de ingelogde medewerker voor de voorstellen, en wijst onder het titelveld op meer dan één regel Titel. De toegankelijkheidstoets herstelt de documenttitel in de eigenschappen. Anonimiseren in het document neemt de eigenschappen mee, met de organisatie als auteur.
