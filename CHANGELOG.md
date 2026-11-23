@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.23.0 — 2026-11-23
+
+- Metadateren: grond, duur en einddatum van een beperking verschijnen alleen bij "beperkt openbaar"; duur en einddatum vult de assistent in.
+- Het paneel geeft de werkomgeving door aan de verbinding (Archiefregeling 2026, art. 2.8).
+- oa-contract 0.15.0, oa-kern 0.15.0.
+
 ## 0.22.0 — 2026-11-23
 
 - De kop toont de naam van de gemeente ("Gemeente Haarlem") in plaats van de code. Anonimiseren in het document gebruikt die naam als auteur.

@@ -144,6 +144,8 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
 
   const huisstijl = useHuisstijl(basis);
   const omgeving = adapter.werkomgeving();
+  // Waarmee versies worden gemaakt, voor de archiefmetadata (Archiefregeling 2026, art. 2.8).
+  verbinding.zetOmgeving(omgeving, typeof navigator !== "undefined" ? navigator.userAgent : undefined);
   const [wie, setWie] = useState<WieBenIk | null>(null);
   // Het metadatamodel van dit stuk, en het model dat nu voor nieuwe stukken geldt.
   const [type, setType] = useState<Objecttype | null>(null);
@@ -816,7 +818,7 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
               </Alert>
             )}
             <fieldset className="oa-velden" disabled={metadataDicht}>
-            {!persoonlijk && velden.map((v) => (
+            {!persoonlijk && velden.filter((v) => metadateren.zichtbaar(v, metadata)).map((v) => (
               <FormField
                 key={v.naam}
                 label={<label htmlFor={`oa-${v.naam}`}>{v.label}{v.verplicht ? " (verplicht)" : ""}</label>}
@@ -838,14 +840,14 @@ export function Paneel({ adapter, basis = "", sessie, knoppen = "rechts", module
                     {voorstellen[v.naam] && !metadata[v.naam] && (
                       <span className="oa-voorstel">
                         Voorstel: <q>{voorstellen[v.naam]}</q>{" "}
-                        <SubtleButton onClick={() => setMetadata((m) => ({ ...m, [v.naam]: voorstellen[v.naam] }))}>Overnemen</SubtleButton>
+                        <SubtleButton onClick={() => setMetadata((m) => (type ? metadateren.afgeleid(type, { ...m, [v.naam]: voorstellen[v.naam]! }) : { ...m, [v.naam]: voorstellen[v.naam]! }))}>Overnemen</SubtleButton>
                       </span>
                     )}
                   </>
                 }
                 invalid={!!fouten[v.naam]}
                 errorMessage={fouten[v.naam]}
-                input={veldInvoer(v, metadata[v.naam] ?? "", (w) => setMetadata((m) => ({ ...m, [v.naam]: w })), !!fouten[v.naam])}
+                input={veldInvoer(v, metadata[v.naam] ?? "", (w) => setMetadata((m) => (type ? metadateren.afgeleid(type, { ...m, [v.naam]: w }) : { ...m, [v.naam]: w })), !!fouten[v.naam])}
               />
             ))}
             </fieldset>
