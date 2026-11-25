@@ -338,3 +338,6 @@
 .oa-pii-voorstel p { margin: 0; }
 .oa-toen { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .oa-toen p { margin: 0; }
+.oa-originelen { display: grid; gap: 6px; margin: 6px 0; }
+.oa-originelen .oa-let-op { color: var(--oa-waarschuwing, #8a5300); }
+.oa-kaart-kop .oa-onthuld { font-size: 0.9em; }

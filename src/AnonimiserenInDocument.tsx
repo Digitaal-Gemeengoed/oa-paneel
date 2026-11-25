@@ -48,6 +48,11 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
   const [reden, setReden] = useState("");
   const lijst = useRef<HTMLDivElement>(null);
   const id = stand.object?.identificatie ?? "";
+  /** Staan de originelen nu in de tekst (alleen-lezen document)? Dan kan hier verder niets. */
+  const [inTekst, setInTekst] = useState(false);
+  const inTekstRef = useRef(false);
+  inTekstRef.current = inTekst;
+  const dicht = uit || inTekst;
 
   async function doe(naam: string, werk: () => Promise<void>) {
     setBezig(naam);
@@ -61,7 +66,7 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
     }
   }
 
-  // Een sessie die nog loopt (voorvertoningen in het document) weer oppakken.
+  // Een sessie die nog loopt, of een al geanonimiseerd document, weer oppakken.
   useEffect(() => {
     let weg = false;
     anonimiseren
@@ -73,6 +78,16 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter, verbinding, id]);
+
+  // Staan de originelen nog in de tekst (paneel opnieuw geopend)? Bij het verlaten van
+  // dit tabblad of het sluiten van het paneel gaan de plaatshouders altijd terug.
+  useEffect(() => {
+    adapter.piiOriginelenZichtbaar?.().then((z) => z && setInTekst(true)).catch(() => undefined);
+    return () => {
+      if (inTekstRef.current) anonimiseren.verbergOriginelen(adapter).catch(() => undefined);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter]);
 
   // Klik op een plaatshouder in het document: de kaart openen.
   useEffect(() => {
@@ -88,6 +103,10 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
   const leesSelectie = () =>
     doe("anon-selectie", async () => {
       if (!adapter.leesSelectie) return;
+      if (inTekstRef.current) {
+        meld({ soort: "info", tekst: "De originelen staan nu in de tekst. Zet eerst de plaatshouders terug; daarna kun je een selectie anonimiseren." });
+        return;
+      }
       const tekst = (await adapter.leesSelectie()).trim();
       if (tekst.length < 2) {
         meld({ soort: "info", tekst: "Selecteer in het document de tekst die je wilt anonimiseren, en kies dan Anonimiseer selectie." });
@@ -154,7 +173,8 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
     doe("anon-bevestigen", async () => {
       const r = await anonimiseren.bevestigInDocument(adapter, verbinding, stand, sessie!, p.organisatie);
       p.zetStand(r.stand);
-      setSessie(null);
+      // De lijst blijft: de bevestigde gegevens, met hun plaatshouders in het document.
+      setSessie(r.sessie);
       setOpen(null);
       await p.naWijziging(r.stand);
       const n = r.sessie.kaarten.filter((k) => k.status === "bevestigd").length;
@@ -180,6 +200,40 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
 
   const kaarten = sessie?.kaarten ?? [];
   const voorvertoning = kaarten.filter((k) => k.status === "voorvertoning");
+  const bevestigd = kaarten.filter((k) => k.status === "bevestigd");
+  /** Kaarten waarvan je het origineel mag zien, en welke daarvan al onthuld zijn. */
+  const binnenNiveau = kaarten.filter((k) => k.plaatshouder && k.status !== "laat-staan" && k.ppl <= niveau);
+  const onthuld = binnenNiveau.filter((k) => k.waarde !== undefined);
+
+  const toonOriginelen = () =>
+    doe("anon-originelen", async () => {
+      setSessie(await anonimiseren.onthulBinnenNiveau(verbinding, stand, sessie!, niveau));
+    });
+
+  const verbergOriginelen = () =>
+    doe("anon-verbergen", async () => {
+      if (inTekst) await anonimiseren.verbergOriginelen(adapter);
+      setInTekst(false);
+      // Alleen wat uit het register kwam; een voorvertoning houdt haar gevonden waarde.
+      setSessie((s) => s && { ...s, kaarten: s.kaarten.map((k) => (k.status === "bevestigd" ? { ...k, waarde: undefined } : k)) });
+    });
+
+  const inDeTekst = () =>
+    doe("anon-in-tekst", async () => {
+      const n = await anonimiseren.toonOriginelenInDocument(adapter, sessie!);
+      setInTekst(n > 0);
+      meld(
+        n > 0
+          ? { soort: "info", tekst: `${n === 1 ? "1 plek toont" : `${n} plekken tonen`} nu het origineel (onderstippeld). Het document staat op alleen-lezen.` }
+          : { soort: "info", tekst: "Geen van deze plaatshouders staat in de tekst zelf (bijvoorbeeld alleen in een opmerking)." },
+      );
+    });
+
+  const plaatshoudersTerug = () =>
+    doe("anon-terug", async () => {
+      await anonimiseren.verbergOriginelen(adapter);
+      setInTekst(false);
+    });
   const blijft = kaarten.filter((k) => k.status === "laat-staan");
   const sleutelnaam = (c: PiiCategorie) => `doc-${id.slice(0, 8)}-${c}`;
 
@@ -194,6 +248,7 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
           ) : (
             <span className="oa-plh-chip leeg">{mag && k.waarde ? k.waarde : SOORTNAAM[k.soort]}</span>
           )}
+          {!isOpen && mag && k.plaatshouder && k.waarde !== undefined && <span className="oa-onthuld">{k.waarde}</span>}
           <span className="oa-pil">PPL {k.ppl}</span>
           <span className="oa-klein">{artikel(k.categorie)}</span>
         </button>
@@ -248,12 +303,12 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
                 <SubtleButton onClick={() => adapter.toonPiiPlek!(gekozenPlek && k.plekken.includes(gekozenPlek) ? gekozenPlek : k.plekken[0]!)}>Toon in document</SubtleButton>
               )}
               {k.status === "voorvertoning" && redenVoor !== k.sleutel && (
-                <SecondaryActionButton onClick={() => setRedenVoor(k.sleutel)} disabled={uit || bezig !== null}>
+                <SecondaryActionButton onClick={() => setRedenVoor(k.sleutel)} disabled={dicht || bezig !== null}>
                   Laat staan
                 </SecondaryActionButton>
               )}
               {k.status === "voorvertoning" && gekozenPlek && k.plekken.includes(gekozenPlek) && k.plekken.length > 1 && (
-                <SubtleButton onClick={() => laatStaan(k, gekozenPlek)} disabled={uit || bezig !== null}>
+                <SubtleButton onClick={() => laatStaan(k, gekozenPlek)} disabled={dicht || bezig !== null}>
                   Alleen hier laten staan
                 </SubtleButton>
               )}
@@ -261,23 +316,23 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
                 <div className="oa-reden" role="group" aria-label="Waarom laat je het staan?">
                   <span className="oa-klein">Waarom laat je het staan? Dat helpt de herkenning te verbeteren; de waarde zelf wordt niet bewaard.</span>
                   {(Object.keys(LAAT_STAAN_REDENEN) as LaatStaanReden[]).map((r) => (
-                    <SecondaryActionButton key={r} onClick={() => laatStaan(k, undefined, r)} disabled={uit || bezig !== null}>
+                    <SecondaryActionButton key={r} onClick={() => laatStaan(k, undefined, r)} disabled={dicht || bezig !== null}>
                       {LAAT_STAAN_REDENEN[r]}
                     </SecondaryActionButton>
                   ))}
-                  <SubtleButton onClick={() => laatStaan(k)} disabled={uit || bezig !== null}>
+                  <SubtleButton onClick={() => laatStaan(k)} disabled={dicht || bezig !== null}>
                     Zonder reden
                   </SubtleButton>
                   <SubtleButton onClick={() => setRedenVoor(null)}>Annuleer</SubtleButton>
                 </div>
               )}
               {k.status === "bevestigd" && mag && (
-                <SecondaryActionButton onClick={() => laatStaan(k)} disabled={uit || bezig !== null}>
+                <SecondaryActionButton onClick={() => laatStaan(k)} disabled={dicht || bezig !== null}>
                   De-anonimiseer
                 </SecondaryActionButton>
               )}
               {k.status === "laat-staan" && k.waarde && (
-                <SecondaryActionButton onClick={() => voegToe(k.waarde!, k.soort, k.bron, k.categorie)} disabled={uit || bezig !== null}>
+                <SecondaryActionButton onClick={() => voegToe(k.waarde!, k.soort, k.bron, k.categorie)} disabled={dicht || bezig !== null}>
                   Toch anonimiseren
                 </SecondaryActionButton>
               )}
@@ -300,15 +355,15 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
       </p>
 
       <div className="oa-rij">
-        <PrimaryActionButton onClick={zoek} disabled={uit || bezig !== null || !!p.nietBeginnen} busy={bezig === "anon-zoeken"}>
+        <PrimaryActionButton onClick={zoek} disabled={dicht || bezig !== null || !!p.nietBeginnen} busy={bezig === "anon-zoeken"}>
           {sessie ? "Opnieuw zoeken" : "Persoonsgegevens zoeken"}
         </PrimaryActionButton>
         {adapter.leesSelectie ? (
-          <SecondaryActionButton onClick={leesSelectie} disabled={uit || bezig !== null || !!p.nietBeginnen}>
+          <SecondaryActionButton onClick={leesSelectie} disabled={dicht || bezig !== null || !!p.nietBeginnen}>
             Anonimiseer selectie
           </SecondaryActionButton>
         ) : (
-          <SecondaryActionButton onClick={() => setPick({ tekst: "", soort: "naam" })} disabled={uit || bezig !== null || !!p.nietBeginnen}>
+          <SecondaryActionButton onClick={() => setPick({ tekst: "", soort: "naam" })} disabled={dicht || bezig !== null || !!p.nietBeginnen}>
             Tekst anonimiseren…
           </SecondaryActionButton>
         )}
@@ -357,18 +412,68 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
       {sessie && (
         <>
           <div className="oa-anon-status">
-            {voorvertoning.length ? <StatusBadge status="warning">voorvertoning, nog niet bevestigd</StatusBadge> : <StatusBadge status="neutral">niets in voorvertoning</StatusBadge>}
+            {voorvertoning.length ? (
+              <StatusBadge status="warning">voorvertoning, nog niet bevestigd</StatusBadge>
+            ) : bevestigd.length ? (
+              <StatusBadge status="safe">geanonimiseerd</StatusBadge>
+            ) : (
+              <StatusBadge status="neutral">niets in voorvertoning</StatusBadge>
+            )}
             <span className="oa-klein">
-              {voorvertoning.length} in voorvertoning{blijft.length ? `, ${blijft.length} blijven staan` : ""} · origineel: versie {sessie.bronversie}
+              {voorvertoning.length ? `${voorvertoning.length} in voorvertoning` : `${bevestigd.length} bevestigd`}
+              {blijft.length ? `, ${blijft.length} blijven staan` : ""} · origineel: versie {sessie.bronversie}
               {sessie.motor ? ` · ${sessie.motor}` : ""}
             </span>
           </div>
+          {(bevestigd.length > 0 || onthuld.length > 0) && (
+            <div className={`oa-kader oa-originelen${inTekst ? "" : " oa-kader-rustig"}`}>
+              {binnenNiveau.length === 0 ? (
+                <Paragraph small>Je niveau (PPL {niveau}) is te laag om de originelen van deze gegevens te zien.</Paragraph>
+              ) : (
+                <div className="oa-rij">
+                  {onthuld.length < binnenNiveau.length && (
+                    <SecondaryActionButton onClick={toonOriginelen} disabled={uit || bezig !== null} busy={bezig === "anon-originelen"}>
+                      Originelen tonen ({binnenNiveau.length})
+                    </SecondaryActionButton>
+                  )}
+                  {onthuld.length > 0 && anonimiseren.kanOriginelenInDocument(adapter) && !inTekst && (
+                    <SecondaryActionButton onClick={inDeTekst} disabled={uit || bezig !== null || voorvertoning.length > 0} busy={bezig === "anon-in-tekst"}>
+                      Ook in de tekst tonen
+                    </SecondaryActionButton>
+                  )}
+                  {inTekst && (
+                    <PrimaryActionButton onClick={plaatshoudersTerug} disabled={uit || bezig !== null} busy={bezig === "anon-terug"}>
+                      Plaatshouders terug in de tekst
+                    </PrimaryActionButton>
+                  )}
+                  {onthuld.length > 0 && (
+                    <SubtleButton onClick={verbergOriginelen} disabled={uit || bezig !== null}>
+                      Originelen verbergen
+                    </SubtleButton>
+                  )}
+                </div>
+              )}
+              {binnenNiveau.length > 0 && binnenNiveau.length < kaarten.filter((k) => k.plaatshouder && k.status !== "laat-staan").length && (
+                <Paragraph small>De andere gegevens vragen een hoger niveau dan het jouwe (PPL {niveau}).</Paragraph>
+              )}
+              {onthuld.length > 0 && voorvertoning.length > 0 && anonimiseren.kanOriginelenInDocument(adapter) && (
+                <Paragraph small>In de tekst tonen kan pas als er geen voorvertoning meer is: bevestig eerst.</Paragraph>
+              )}
+              {inTekst && (
+                <Paragraph small className="oa-let-op">
+                  De originelen staan nu in de tekst (onderstippeld). Het document staat op alleen-lezen: opslaan, exporteren, afdrukken en mailen kan niet, en de assistent
+                  leest of wijzigt het document niet. Verlaat je dit tabblad of sluit je de assistent, dan komen de plaatshouders vanzelf terug.
+                </Paragraph>
+              )}
+              {onthuld.length > 0 && !inTekst && <Paragraph small>Het inzien van originelen wordt vastgelegd in de geschiedenis van het stuk.</Paragraph>}
+            </div>
+          )}
           <div className="oa-kaarten" ref={lijst}>
             {kaarten.map(kaart)}
           </div>
           {voorvertoning.length > 0 && (
             <>
-              <PrimaryActionButton onClick={bevestig} disabled={uit || bezig !== null} busy={bezig === "anon-bevestigen"}>
+              <PrimaryActionButton onClick={bevestig} disabled={dicht || bezig !== null} busy={bezig === "anon-bevestigen"}>
                 Bevestigen: nieuwe versie vastleggen
               </PrimaryActionButton>
               <Paragraph small>
@@ -411,7 +516,7 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
             Reden (minstens 10 tekens)
             <textarea rows={2} value={reden} onChange={(e) => setReden(e.target.value)} />
           </label>
-          <SecondaryActionButton onClick={vernietig} disabled={uit || bezig !== null || !vernietigCat || reden.trim().length < 10} busy={bezig === "anon-vernietig"}>
+          <SecondaryActionButton onClick={vernietig} disabled={dicht || bezig !== null || !vernietigCat || reden.trim().length < 10} busy={bezig === "anon-vernietig"}>
             Sleutel vernietigen
           </SecondaryActionButton>
         </details>

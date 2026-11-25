@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.24.0 — 2026-11-25
+
+- Anonimiseren in het document: na **Bevestigen** blijft de lijst met gegevens in beeld (status "geanonimiseerd").
+- Een al geanonimiseerd document wordt bij het openen van de assistent herkend; de lijst wordt uit het register opgehaald.
+- **Originelen tonen**: de originele waarden van alle gegevens binnen het eigen niveau (PPL) in de lijst, met **Originelen verbergen**. Het inzien wordt vastgelegd in de geschiedenis van het stuk.
+- **Ook in de tekst tonen** (LibreOffice Writer): de originelen tijdelijk op de plaats van de plaatshouders, onderstippeld. Het document staat dan op alleen-lezen; opslaan, exporteren, afdrukken en mailen zijn uitgeschakeld en de overige handelingen in het paneel staan stil. **Plaatshouders terug in de tekst** maakt dit ongedaan; ook bij het verlaten van het tabblad of het sluiten van de assistent.
+- oa-contract 0.16.0, oa-kern 0.16.0.
+
 ## 0.23.0 — 2026-11-23
 
 - Metadateren: grond, duur en einddatum van een beperking verschijnen alleen bij "beperkt openbaar"; duur en einddatum vult de assistent in.
