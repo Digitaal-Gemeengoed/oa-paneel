@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.24.1 — 2026-11-26
+
+- Anonimiseren in het document: na **Bevestigen** ziet ook de maker van het stuk alleen de originelen binnen zijn eigen niveau (PPL); de herkende waarden daarboven gaan uit het paneel.
+- oa-kern 0.16.1.
+
 ## 0.24.0 — 2026-11-25
 
 - Anonimiseren in het document: na **Bevestigen** blijft de lijst met gegevens in beeld (status "geanonimiseerd").

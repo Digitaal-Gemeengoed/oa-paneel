@@ -174,7 +174,8 @@ export function AnonimiserenInDocument(p: AnonimiserenInDocumentProps) {
       const r = await anonimiseren.bevestigInDocument(adapter, verbinding, stand, sessie!, p.organisatie);
       p.zetStand(r.stand);
       // De lijst blijft: de bevestigde gegevens, met hun plaatshouders in het document.
-      setSessie(r.sessie);
+      // Originelen daarna alleen binnen je eigen niveau, ook als je het stuk zelf anonimiseerde.
+      setSessie(anonimiseren.beperkTotNiveau(r.sessie, niveau));
       setOpen(null);
       await p.naWijziging(r.stand);
       const n = r.sessie.kaarten.filter((k) => k.status === "bevestigd").length;
